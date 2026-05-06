@@ -308,6 +308,63 @@ function pointsPath(points) {
     .join(" ");
 }
 
+function distance(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function interpolate(a, b, amount) {
+  return {
+    x: a.x + (b.x - a.x) * amount,
+    y: a.y + (b.y - a.y) * amount,
+  };
+}
+
+function pointAlong(points, targetDistance) {
+  if (targetDistance <= 0) return points[0];
+  let travelled = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    const previous = points[index - 1];
+    const current = points[index];
+    const segment = distance(previous, current);
+    if (travelled + segment >= targetDistance) {
+      return interpolate(previous, current, (targetDistance - travelled) / segment);
+    }
+    travelled += segment;
+  }
+  return points[points.length - 1];
+}
+
+function trimPolyline(points, startDistance, endDistance) {
+  const total = points.slice(1).reduce((sum, point, index) => sum + distance(points[index], point), 0);
+  const start = Math.max(0, Math.min(startDistance, total));
+  const end = Math.max(start, Math.min(endDistance, total));
+  if (end - start < 2) return [];
+
+  const result = [pointAlong(points, start)];
+  let travelled = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    const previous = points[index - 1];
+    const current = points[index];
+    const segmentStart = travelled;
+    const segmentEnd = travelled + distance(previous, current);
+    if (segmentEnd > start && segmentEnd < end) result.push(current);
+    travelled = segmentEnd;
+  }
+  result.push(pointAlong(points, end));
+  return result;
+}
+
+function extendExitPoints(piece) {
+  const base = piece.cells.map(point);
+  const head = base[base.length - 1];
+  const direction = DIRECTIONS[piece.direction];
+  const exit = {
+    x: head.x + direction.col * (Math.max(state.rows, state.cols) * CELL * 1.35),
+    y: head.y + direction.row * (Math.max(state.rows, state.cols) * CELL * 1.35),
+  };
+  return [...base, exit];
+}
+
 function renderBoard() {
   boardEl.innerHTML = "";
   boardEl.style.setProperty("--rows", state.rows);
@@ -364,46 +421,33 @@ function renderBoard() {
 }
 
 function animateEscape(piece) {
-  const direction = DIRECTIONS[piece.direction];
   const group = boardEl.querySelector(`[data-id="${piece.id}"]`);
   if (!group) return;
   const body = group.querySelector(".rope-body");
   const shadow = group.querySelector(".rope-shadow");
   const head = group.querySelector(".rope-head");
   const start = performance.now();
-  const duration = 720;
-  const basePoints = piece.cells.map(point);
-  const pullDistance = Math.max(state.rows, state.cols) * CELL * 1.25;
+  const duration = 780;
+  const pullPath = extendExitPoints(piece);
+  const total = pullPath.slice(1).reduce((sum, pathPoint, index) => sum + distance(pullPath[index], pathPoint), 0);
+  const visibleLength = piece.cells.length * CELL;
 
   group.classList.add("pulling");
 
   function frame(now) {
     const elapsed = Math.min(1, (now - start) / duration);
     const eased = 1 - Math.pow(1 - elapsed, 3);
-    const distance = eased * pullDistance;
-    const shifted = basePoints
-      .map((basePoint, index) => {
-        const lag = (basePoints.length - 1 - index) * CELL * 0.34;
-        const localDistance = Math.max(0, distance - lag);
-        return {
-          x: basePoint.x + direction.col * localDistance,
-          y: basePoint.y + direction.row * localDistance,
-        };
-      })
-      .filter((item) => (
-        item.x > -PAD * 2
-        && item.x < PAD * 2 + (state.cols - 1) * CELL
-        && item.y > -PAD * 2
-        && item.y < PAD * 2 + (state.rows - 1) * CELL
-      ));
+    const headDistance = eased * total;
+    const tailDistance = Math.max(0, headDistance - visibleLength * (1 - eased * 0.18));
+    const visible = trimPolyline(pullPath, tailDistance, headDistance);
 
-    if (shifted.length >= 2) {
-      const d = pointsPath(shifted);
+    if (visible.length >= 2) {
+      const d = pointsPath(visible);
       body.setAttribute("d", d);
       shadow.setAttribute("d", d);
-      const transient = { ...piece, points: shifted };
+      const transient = { ...piece, points: visible };
       head.setAttribute("points", arrowHeadPoints(transient));
-      group.style.opacity = String(1 - eased * 0.75);
+      group.style.opacity = String(1 - eased * 0.45);
     } else {
       group.style.opacity = "0";
     }
