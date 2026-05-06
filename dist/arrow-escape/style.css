@@ -405,9 +405,11 @@ menu button {
 }
 
 @keyframes blocked {
-  25% { transform: translateX(-5px) translateZ(24px); }
-  50% { transform: translateX(5px) translateZ(24px); }
-  75% { transform: translateX(-3px) translateZ(24px); }
+  0% { transform: translate(0, 0); }
+  38% { transform: translate(var(--bump-x), var(--bump-y)); }
+  58% { transform: translate(calc(var(--bump-x) * -0.22), calc(var(--bump-y) * -0.22)); }
+  78% { transform: translate(calc(var(--bump-x) * 0.1), calc(var(--bump-y) * 0.1)); }
+  100% { transform: translate(0, 0); }
 }
 
 @media (max-width: 780px) {

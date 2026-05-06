@@ -458,10 +458,13 @@ function animateEscape(piece) {
   window.requestAnimationFrame(frame);
 }
 
-function markBlocked(id) {
-  boardEl.querySelectorAll(`[data-id="${id}"]`).forEach((piece) => {
-    piece.classList.remove("blocked");
-    window.requestAnimationFrame(() => piece.classList.add("blocked"));
+function markBlocked(piece) {
+  const direction = DIRECTIONS[piece.direction];
+  boardEl.querySelectorAll(`[data-id="${piece.id}"]`).forEach((group) => {
+    group.classList.remove("blocked");
+    group.style.setProperty("--bump-x", `${direction.col * 26}px`);
+    group.style.setProperty("--bump-y", `${direction.row * 26}px`);
+    window.requestAnimationFrame(() => group.classList.add("blocked"));
   });
 }
 
@@ -470,7 +473,7 @@ function movePiece(id) {
   if (!piece || piece.escaped || state.ended) return;
 
   if (!canEscape(piece)) {
-    markBlocked(id);
+    markBlocked(piece);
     state.mistakes += 1;
     updateHud();
     messageEl.textContent = state.mistakes >= state.maxMistakes ? "ミスが3回になりました" : "進路が塞がっています";
