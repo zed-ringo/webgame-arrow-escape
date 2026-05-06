@@ -1,19 +1,21 @@
 const CONFIGS = {
-  easy: { rows: 6, cols: 8, targetPieces: 8, minLength: 3, maxLength: 5 },
-  normal: { rows: 7, cols: 10, targetPieces: 13, minLength: 3, maxLength: 6 },
-  hard: { rows: 8, cols: 10, targetPieces: 15, minLength: 4, maxLength: 6 },
+  easy: { rows: 8, cols: 8, targetPieces: 7, minLength: 3, maxLength: 5 },
+  normal: { rows: 9, cols: 9, targetPieces: 12, minLength: 3, maxLength: 7 },
+  hard: { rows: 10, cols: 10, targetPieces: 17, minLength: 4, maxLength: 8 },
 };
 
 const DIRECTIONS = {
-  up: { row: -1, col: 0, label: "上", x: 0, y: -900, angle: -90 },
-  right: { row: 0, col: 1, label: "右", x: 1100, y: 0, angle: 0 },
-  down: { row: 1, col: 0, label: "下", x: 0, y: 900, angle: 90 },
-  left: { row: 0, col: -1, label: "左", x: -1100, y: 0, angle: 180 },
+  up: { row: -1, col: 0, glyph: "↑", x: 0, y: -980, angle: -90 },
+  right: { row: 0, col: 1, glyph: "→", x: 980, y: 0, angle: 0 },
+  down: { row: 1, col: 0, glyph: "↓", x: 0, y: 980, angle: 90 },
+  left: { row: 0, col: -1, glyph: "←", x: -980, y: 0, angle: 180 },
 };
 
-const COLORS = ["#58e7a5", "#58a9ff", "#ffd15c", "#ff7aa8", "#a990ff", "#ff8d55"];
+const COLORS = ["#111936", "#273d9a", "#111936", "#5160bf"];
 const STORAGE_KEY = "arrow-escape-records";
-const CELL = 100;
+const CELL = 84;
+const PAD = 54;
+
 const boardEl = document.querySelector("#board");
 const sceneEl = document.querySelector("#scene");
 const movesEl = document.querySelector("#moves");
@@ -43,6 +45,23 @@ function createState(difficulty = "normal") {
   };
 }
 
+function key(row, col) {
+  return `${row},${col}`;
+}
+
+function inBounds(row, col) {
+  return row >= 0 && row < state.rows && col >= 0 && col < state.cols;
+}
+
+function shuffled(values) {
+  const result = [...values];
+  for (let i = result.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
 function loadRecords() {
   try {
     return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
@@ -65,27 +84,6 @@ function updateHud() {
   missesEl.textContent = `${state.mistakes}/${state.maxMistakes}`;
 }
 
-function key(row, col) {
-  return `${row},${col}`;
-}
-
-function inBounds(row, col) {
-  return row >= 0 && row < state.rows && col >= 0 && col < state.cols;
-}
-
-function randInt(min, max) {
-  return min + Math.floor(Math.random() * (max - min + 1));
-}
-
-function shuffled(values) {
-  const result = [...values];
-  for (let i = result.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [result[i], result[j]] = [result[j], result[i]];
-  }
-  return result;
-}
-
 function occupiedBy(pieces, excludeId = null) {
   const occupied = new Map();
   pieces.forEach((piece) => {
@@ -93,6 +91,22 @@ function occupiedBy(pieces, excludeId = null) {
     piece.cells.forEach((cell) => occupied.set(key(cell.row, cell.col), piece.id));
   });
   return occupied;
+}
+
+function canEscape(piece, pieces = state.pieces) {
+  const occupied = occupiedBy(pieces, piece.id);
+  const direction = DIRECTIONS[piece.direction];
+  let step = 1;
+  while (true) {
+    const shifted = piece.cells.map((cell) => ({
+      row: cell.row + direction.row * step,
+      col: cell.col + direction.col * step,
+    }));
+    const inBoard = shifted.filter((cell) => inBounds(cell.row, cell.col));
+    if (!inBoard.length) return true;
+    if (inBoard.some((cell) => occupied.has(key(cell.row, cell.col)))) return false;
+    step += 1;
+  }
 }
 
 function rayClear(cell, directionName, occupied) {
@@ -145,7 +159,7 @@ function growthOptions(directionName) {
   return [backward, backward, ...sideways];
 }
 
-function createArrowLineCandidate(occupied, length, directionName) {
+function createRopeCandidate(occupied, length, directionName) {
   const starts = shuffled(Array.from({ length: state.rows * state.cols }, (_, index) => ({
     row: Math.floor(index / state.cols),
     col: index % state.cols,
@@ -158,7 +172,6 @@ function createArrowLineCandidate(occupied, length, directionName) {
     const used = new Set([key(head.row, head.col)]);
 
     while (cells.length < length) {
-      let next = null;
       const tail = cells[cells.length - 1];
       const options = shuffled(growBy)
         .map((direction) => ({ row: tail.row + direction.row, col: tail.col + direction.col }))
@@ -169,34 +182,31 @@ function createArrowLineCandidate(occupied, length, directionName) {
             && !occupied.has(cellKey)
             && rayClear(cell, directionName, occupied);
         });
-      if (options.length) next = options[0];
-      if (!next) break;
+      if (!options.length) break;
+      const next = options[0];
       cells.push(next);
       used.add(key(next.row, next.col));
     }
 
     if (cells.length === length) return cells.reverse();
   }
-
   return null;
 }
 
-function createArrowLine(occupied, length, pieces) {
+function createRope(occupied, length, pieces) {
   const targets = blockingTargets(pieces, occupied);
   let best = null;
-
-  for (let attempt = 0; attempt < 28; attempt += 1) {
+  for (let attempt = 0; attempt < 34; attempt += 1) {
     const direction = shuffled(Object.keys(DIRECTIONS))[0];
-    const cells = createArrowLineCandidate(occupied, length, direction);
+    const cells = createRopeCandidate(occupied, length, direction);
     if (!cells) continue;
     const blocks = cells.filter((cell) => targets.has(key(cell.row, cell.col))).length;
     const edgeDistance = Math.min(...cells.map((cell) => (
       Math.min(cell.row, state.rows - 1 - cell.row, cell.col, state.cols - 1 - cell.col)
     )));
-    const score = blocks * 10 + edgeDistance + Math.random();
+    const score = blocks * 14 + edgeDistance + Math.random();
     if (!best || score > best.score) best = { cells, direction, score };
   }
-
   return best;
 }
 
@@ -207,8 +217,8 @@ function generatePieces() {
 
   while (pieces.length < state.targetPieces && attempts < state.targetPieces * 70) {
     attempts += 1;
-    const length = randInt(state.minLength, state.maxLength);
-    const candidate = createArrowLine(occupied, length, pieces);
+    const length = state.minLength + Math.floor(Math.random() * (state.maxLength - state.minLength + 1));
+    const candidate = createRope(occupied, length, pieces);
     if (!candidate) continue;
     const { cells, direction } = candidate;
     cells.forEach((cell) => occupied.set(key(cell.row, cell.col), pieces.length + 1));
@@ -221,49 +231,31 @@ function generatePieces() {
     });
   }
 
-  return pieces.reverse().map((piece, index) => ({ ...piece, id: index + 1 }));
+  return pieces.reverse().map((piece, index) => ({ ...piece, id: index + 1, color: COLORS[index % COLORS.length] }));
 }
 
-function canEscape(piece, pieces = state.pieces) {
-  const occupied = occupiedBy(pieces, piece.id);
-  const direction = DIRECTIONS[piece.direction];
-  let step = 1;
-
-  while (true) {
-    const shifted = piece.cells.map((cell) => ({
-      row: cell.row + direction.row * step,
-      col: cell.col + direction.col * step,
-    }));
-
-    const inBoard = shifted.filter((cell) => inBounds(cell.row, cell.col));
-    if (!inBoard.length) return true;
-    if (inBoard.some((cell) => occupied.has(key(cell.row, cell.col)))) return false;
-    step += 1;
-  }
-}
-
-function cellPoint(cell) {
+function point(cell) {
   return {
-    x: cell.col * CELL + CELL / 2,
-    y: cell.row * CELL + CELL / 2,
+    x: PAD + cell.col * CELL,
+    y: PAD + cell.row * CELL,
   };
 }
 
-function arrowPath(cells) {
+function ropePath(cells) {
   return cells
     .map((cell, index) => {
-      const point = cellPoint(cell);
-      return `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`;
+      const p = point(cell);
+      return `${index === 0 ? "M" : "L"} ${p.x} ${p.y}`;
     })
     .join(" ");
 }
 
 function arrowHeadPoints(piece) {
-  const head = cellPoint(piece.cells[piece.cells.length - 1]);
+  const head = point(piece.cells[piece.cells.length - 1]);
   const angle = DIRECTIONS[piece.direction].angle * Math.PI / 180;
-  const tip = { x: head.x + Math.cos(angle) * 40, y: head.y + Math.sin(angle) * 40 };
-  const left = { x: head.x + Math.cos(angle + 2.45) * 34, y: head.y + Math.sin(angle + 2.45) * 34 };
-  const right = { x: head.x + Math.cos(angle - 2.45) * 34, y: head.y + Math.sin(angle - 2.45) * 34 };
+  const tip = { x: head.x + Math.cos(angle) * 35, y: head.y + Math.sin(angle) * 35 };
+  const left = { x: head.x + Math.cos(angle + 2.48) * 28, y: head.y + Math.sin(angle + 2.48) * 28 };
+  const right = { x: head.x + Math.cos(angle - 2.48) * 28, y: head.y + Math.sin(angle - 2.48) * 28 };
   return `${tip.x},${tip.y} ${left.x},${left.y} ${right.x},${right.y}`;
 }
 
@@ -271,33 +263,47 @@ function renderBoard() {
   boardEl.innerHTML = "";
   boardEl.style.setProperty("--rows", state.rows);
   boardEl.style.setProperty("--cols", state.cols);
-  boardEl.style.setProperty("--view-width", state.cols * CELL);
-  boardEl.style.setProperty("--view-height", state.rows * CELL);
+  boardEl.style.setProperty("--view-width", PAD * 2 + (state.cols - 1) * CELL);
+  boardEl.style.setProperty("--view-height", PAD * 2 + (state.rows - 1) * CELL);
 
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("viewBox", `0 0 ${state.cols * CELL} ${state.rows * CELL}`);
+  svg.classList.add("rope-field");
+  svg.setAttribute("viewBox", `0 0 ${PAD * 2 + (state.cols - 1) * CELL} ${PAD * 2 + (state.rows - 1) * CELL}`);
   svg.setAttribute("role", "presentation");
-  svg.classList.add("arrow-field");
+
+  for (let row = 0; row < state.rows; row += 1) {
+    for (let col = 0; col < state.cols; col += 1) {
+      const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      const p = point({ row, col });
+      dot.classList.add("grid-dot");
+      dot.setAttribute("cx", p.x);
+      dot.setAttribute("cy", p.y);
+      dot.setAttribute("r", "4.2");
+      svg.append(dot);
+    }
+  }
 
   state.pieces.filter((piece) => !piece.escaped).forEach((piece) => {
     const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    group.classList.add("arrow-piece");
+    group.classList.add("rope-piece");
     group.dataset.id = piece.id;
     group.style.setProperty("--piece-color", piece.color);
     group.setAttribute("tabindex", "0");
     group.setAttribute("role", "button");
-    group.setAttribute("aria-label", `${DIRECTIONS[piece.direction].label}へ抜ける矢印`);
+    group.setAttribute("aria-label", `${DIRECTIONS[piece.direction].glyph} 方向の矢印`);
 
     const shadow = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    shadow.classList.add("arrow-shadow");
-    shadow.setAttribute("d", arrowPath(piece.cells));
+    shadow.classList.add("rope-shadow");
+    shadow.setAttribute("d", ropePath(piece.cells));
+    shadow.setAttribute("pathLength", "100");
 
     const body = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    body.classList.add("arrow-body");
-    body.setAttribute("d", arrowPath(piece.cells));
+    body.classList.add("rope-body");
+    body.setAttribute("d", ropePath(piece.cells));
+    body.setAttribute("pathLength", "100");
 
     const head = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-    head.classList.add("arrow-head");
+    head.classList.add("rope-head");
     head.setAttribute("points", arrowHeadPoints(piece));
 
     group.append(shadow, body, head);
@@ -308,42 +314,45 @@ function renderBoard() {
   updateBoardScale();
 }
 
+function animateEscape(piece) {
+  const direction = DIRECTIONS[piece.direction];
+  const group = boardEl.querySelector(`[data-id="${piece.id}"]`);
+  if (!group) return;
+  group.style.setProperty("--escape-x", `${direction.x}px`);
+  group.style.setProperty("--escape-y", `${direction.y}px`);
+  group.classList.add("escaping");
+}
+
+function markBlocked(id) {
+  boardEl.querySelectorAll(`[data-id="${id}"]`).forEach((piece) => {
+    piece.classList.remove("blocked");
+    window.requestAnimationFrame(() => piece.classList.add("blocked"));
+  });
+}
+
 function movePiece(id) {
   const piece = state.pieces.find((item) => item.id === id);
   if (!piece || piece.escaped || state.ended) return;
 
   if (!canEscape(piece)) {
-    const segments = boardEl.querySelectorAll(`[data-id="${id}"]`);
-    segments.forEach((segment) => {
-      segment.classList.remove("blocked");
-      window.requestAnimationFrame(() => segment.classList.add("blocked"));
-    });
+    markBlocked(id);
     state.mistakes += 1;
     updateHud();
-    messageEl.textContent = state.mistakes >= state.maxMistakes ? "ミスが3回になりました" : "その矢印はまだ抜けられません";
+    messageEl.textContent = state.mistakes >= state.maxMistakes ? "ミスが3回になりました" : "進路が塞がっています";
     checkLose();
     return;
   }
 
-  state.history.push({ id, escaped: false });
+  state.history.push({ id });
   state.moves += 1;
   state.left -= 1;
   piece.escaped = true;
   animateEscape(piece);
-  emitPieceParticles(piece, "#5de2a8", 20);
-  window.setTimeout(renderBoard, 210);
-  messageEl.textContent = state.left ? "次に抜けられる矢印の形を読みましょう" : "すべての矢印が脱出しました";
+  emitPieceParticles(piece, "#4b5caa", 12);
+  window.setTimeout(renderBoard, 640);
+  messageEl.textContent = state.left ? "紐の進路を読んで、次の矢印を抜きましょう" : "すべての矢印が脱出しました";
   updateHud();
   checkWin();
-}
-
-function animateEscape(piece) {
-  const direction = DIRECTIONS[piece.direction];
-  boardEl.querySelectorAll(`[data-id="${piece.id}"]`).forEach((segment) => {
-    segment.style.setProperty("--escape-x", `${direction.x}px`);
-    segment.style.setProperty("--escape-y", `${direction.y}px`);
-    segment.classList.add("escaping");
-  });
 }
 
 function undoMove() {
@@ -363,10 +372,9 @@ function showHint() {
   const candidates = state.pieces.filter((piece) => !piece.escaped && canEscape(piece));
   if (!candidates.length || state.ended) return;
   const piece = candidates[Math.floor(Math.random() * candidates.length)];
-  boardEl.querySelectorAll(`[data-id="${piece.id}"]`).forEach((segment) => segment.classList.add("hint-pulse"));
-  window.setTimeout(() => {
-    boardEl.querySelectorAll(`[data-id="${piece.id}"]`).forEach((segment) => segment.classList.remove("hint-pulse"));
-  }, 850);
+  const group = boardEl.querySelector(`[data-id="${piece.id}"]`);
+  group?.classList.add("hint-pulse");
+  window.setTimeout(() => group?.classList.remove("hint-pulse"), 850);
   messageEl.textContent = "光った矢印は抜けられます";
 }
 
@@ -374,7 +382,7 @@ function checkWin() {
   if (state.left !== 0) return;
   state.ended = true;
   saveRecord(state.difficulty, state.moves);
-  emitSceneParticles("#65b7ff", 90);
+  emitSceneParticles("#4b5caa", 80);
   document.querySelector("#result-kicker").textContent = "CLEAR";
   document.querySelector("#result-title").textContent = "脱出完了";
   resultCopy.textContent = `${state.moves}手でクリアしました。ベストはこの端末に保存されます。`;
@@ -386,7 +394,7 @@ function checkLose() {
   state.ended = true;
   document.querySelector("#result-kicker").textContent = "MISS";
   document.querySelector("#result-title").textContent = "脱出失敗";
-  resultCopy.textContent = "ミスは3回までです。矢印の形と進路を読み直して再挑戦しましょう。";
+  resultCopy.textContent = "ミスは3回までです。紐の出口を読み直して再挑戦しましょう。";
   if (typeof dialog.showModal === "function") dialog.showModal();
 }
 
@@ -396,16 +404,16 @@ function startGame(difficulty = state?.difficulty || "normal") {
   state.left = state.pieces.length;
   renderBoard();
   updateHud();
-  messageEl.textContent = "正しい矢印を選んで、3ミス以内に脱出させましょう";
+  messageEl.textContent = "先端の向きに紐を引き抜きましょう";
   document.querySelectorAll("[data-difficulty]").forEach((button) => {
     button.setAttribute("aria-pressed", String(button.dataset.difficulty === difficulty));
   });
 }
 
 function pieceFromEvent(event) {
-  const segment = event.target.closest(".arrow-piece");
-  if (!segment || !boardEl.contains(segment)) return null;
-  return Number(segment.dataset.id);
+  const piece = event.target.closest(".rope-piece");
+  if (!piece || !boardEl.contains(piece)) return null;
+  return Number(piece.dataset.id);
 }
 
 boardEl.addEventListener("click", (event) => {
@@ -439,13 +447,11 @@ function updateBoardScale() {
   if (!state) return;
   const sceneRect = sceneEl.getBoundingClientRect();
   const compact = sceneRect.width < 560;
-  const gap = compact ? 4 : 7;
-  const pad = compact ? 8 : 14;
-  const maxCell = compact ? 48 : 54;
-  const widthCell = (sceneRect.width - 24 - pad * 2 - gap * (state.cols - 1)) / state.cols;
-  const heightCell = (sceneRect.height - 24 - pad * 2 - gap * (state.rows - 1)) / state.rows;
-  const cellSize = Math.max(26, Math.floor(Math.min(widthCell, heightCell, maxCell)));
-  boardEl.style.setProperty("--gap", `${gap}px`);
+  const pad = compact ? 10 : 16;
+  const maxCell = compact ? 46 : 58;
+  const widthCell = (sceneRect.width - 24 - pad * 2) / state.cols;
+  const heightCell = (sceneRect.height - 24 - pad * 2) / state.rows;
+  const cellSize = Math.max(28, Math.floor(Math.min(widthCell, heightCell, maxCell)));
   boardEl.style.setProperty("--board-pad", `${pad}px`);
   boardEl.style.setProperty("--cell-size", `${cellSize}px`);
 }
@@ -466,9 +472,9 @@ function emitPieceParticles(piece, color, count) {
     particles.push({
       x: center.x,
       y: center.y,
-      vx: (Math.random() - 0.5) * 5,
-      vy: (Math.random() - 0.8) * 5,
-      life: 28 + Math.random() * 20,
+      vx: (Math.random() - 0.5) * 4,
+      vy: (Math.random() - 0.8) * 4,
+      life: 24 + Math.random() * 18,
       age: 0,
       size: 2 + Math.random() * 3,
       color,
