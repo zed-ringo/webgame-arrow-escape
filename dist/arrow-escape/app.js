@@ -381,6 +381,18 @@ function extendExitPoints(piece) {
   return [...base, exit];
 }
 
+function extendBlockedPoints(piece) {
+  const base = piece.cells.map(point);
+  const head = base[base.length - 1];
+  const direction = DIRECTIONS[piece.direction];
+  const travel = Math.max(0.32, blockedTravelCells(piece) + 0.22) * CELL;
+  const collision = {
+    x: head.x + direction.col * travel,
+    y: head.y + direction.row * travel,
+  };
+  return [...base, collision];
+}
+
 function renderBoard() {
   boardEl.innerHTML = "";
   boardEl.style.setProperty("--rows", state.rows);
@@ -475,14 +487,46 @@ function animateEscape(piece) {
 }
 
 function markBlocked(piece) {
-  const direction = DIRECTIONS[piece.direction];
-  const travel = Math.max(0.32, blockedTravelCells(piece) + 0.22);
-  boardEl.querySelectorAll(`[data-id="${piece.id}"]`).forEach((group) => {
-    group.classList.remove("blocked");
-    group.style.setProperty("--bump-x", `${direction.col * travel * CELL}px`);
-    group.style.setProperty("--bump-y", `${direction.row * travel * CELL}px`);
-    window.requestAnimationFrame(() => group.classList.add("blocked"));
-  });
+  const group = boardEl.querySelector(`[data-id="${piece.id}"]`);
+  if (!group) return;
+  const body = group.querySelector(".rope-body");
+  const shadow = group.querySelector(".rope-shadow");
+  const head = group.querySelector(".rope-head");
+  const start = performance.now();
+  const duration = 360;
+  const basePoints = piece.cells.map(point);
+  const pullPath = extendBlockedPoints(piece);
+  const total = pullPath.slice(1).reduce((sum, pathPoint, index) => sum + distance(pullPath[index], pathPoint), 0);
+  const baseTotal = basePoints.slice(1).reduce((sum, pathPoint, index) => sum + distance(basePoints[index], pathPoint), 0);
+  const visibleLength = piece.cells.length * CELL;
+
+  group.classList.remove("blocked");
+  group.classList.add("blocked");
+
+  function setVisible(points) {
+    const d = pointsPath(points);
+    body.setAttribute("d", d);
+    shadow.setAttribute("d", d);
+    head.setAttribute("points", arrowHeadPoints({ ...piece, points }));
+  }
+
+  function frame(now) {
+    const elapsed = Math.min(1, (now - start) / duration);
+    const phase = elapsed < 0.48 ? elapsed / 0.48 : 1 - ((elapsed - 0.48) / 0.52);
+    const eased = 1 - Math.pow(1 - Math.max(0, phase), 3);
+    const headDistance = baseTotal + eased * Math.max(0, total - baseTotal);
+    const tailDistance = Math.max(0, headDistance - visibleLength);
+    const visible = trimPolyline(pullPath, tailDistance, headDistance);
+    if (visible.length >= 2) setVisible(visible);
+    if (elapsed < 1) {
+      window.requestAnimationFrame(frame);
+    } else {
+      setVisible(basePoints);
+      group.classList.remove("blocked");
+    }
+  }
+
+  window.requestAnimationFrame(frame);
 }
 
 function movePiece(id) {

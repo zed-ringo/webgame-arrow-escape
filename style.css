@@ -341,7 +341,7 @@ h1 {
 }
 
 .rope-piece.blocked {
-  animation: blocked 240ms ease;
+  filter: drop-shadow(0 0 8px rgba(255, 79, 115, 0.34));
 }
 
 .rope-piece.pulling {
@@ -402,14 +402,6 @@ menu button {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid var(--line);
   font-weight: 800;
-}
-
-@keyframes blocked {
-  0% { transform: translate(0, 0); }
-  38% { transform: translate(var(--bump-x), var(--bump-y)); }
-  58% { transform: translate(calc(var(--bump-x) * -0.22), calc(var(--bump-y) * -0.22)); }
-  78% { transform: translate(calc(var(--bump-x) * 0.1), calc(var(--bump-y) * 0.1)); }
-  100% { transform: translate(0, 0); }
 }
 
 @media (max-width: 780px) {
