@@ -142,6 +142,22 @@ function canEscape(piece, pieces = state.pieces) {
   }
 }
 
+function blockedTravelCells(piece, pieces = state.pieces) {
+  const occupied = occupiedBy(pieces, piece.id);
+  const direction = DIRECTIONS[piece.direction];
+  let step = 1;
+  while (true) {
+    const shifted = piece.cells.map((cell) => ({
+      row: cell.row + direction.row * step,
+      col: cell.col + direction.col * step,
+    }));
+    const inBoard = shifted.filter((cell) => inBounds(cell.row, cell.col));
+    if (!inBoard.length) return step;
+    if (inBoard.some((cell) => occupied.has(key(cell.row, cell.col)))) return Math.max(0, step - 1);
+    step += 1;
+  }
+}
+
 function rayClear(cell, directionName, occupied) {
   const direction = DIRECTIONS[directionName];
   let row = cell.row + direction.row;
@@ -460,10 +476,11 @@ function animateEscape(piece) {
 
 function markBlocked(piece) {
   const direction = DIRECTIONS[piece.direction];
+  const travel = Math.max(0.32, blockedTravelCells(piece) + 0.22);
   boardEl.querySelectorAll(`[data-id="${piece.id}"]`).forEach((group) => {
     group.classList.remove("blocked");
-    group.style.setProperty("--bump-x", `${direction.col * 26}px`);
-    group.style.setProperty("--bump-y", `${direction.row * 26}px`);
+    group.style.setProperty("--bump-x", `${direction.col * travel * CELL}px`);
+    group.style.setProperty("--bump-y", `${direction.row * travel * CELL}px`);
     window.requestAnimationFrame(() => group.classList.add("blocked"));
   });
 }
