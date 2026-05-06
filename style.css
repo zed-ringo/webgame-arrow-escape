@@ -325,7 +325,7 @@ h1 {
   cursor: pointer;
   filter: drop-shadow(0 14px 8px rgba(0, 0, 0, 0.38));
   transform-origin: center;
-  transition: opacity 240ms ease, transform 240ms ease, filter 180ms ease;
+  transition: filter 180ms ease;
 }
 
 .arrow-piece:hover,
@@ -352,6 +352,7 @@ h1 {
 .arrow-body {
   stroke: var(--piece-color);
   stroke-width: 52;
+  transition: stroke-width 260ms ease;
 }
 
 .arrow-head {
@@ -366,8 +367,15 @@ h1 {
 }
 
 .arrow-piece.escaping {
-  opacity: 0;
-  transform: translate(var(--escape-x), var(--escape-y)) scale(0.74);
+  animation: arrowEscape 560ms cubic-bezier(0.18, 0.82, 0.16, 1) forwards;
+}
+
+.arrow-piece.escaping .arrow-body {
+  stroke-width: 36;
+}
+
+.arrow-piece.escaping .arrow-shadow {
+  opacity: 0.2;
 }
 
 .arrow-piece.hint-pulse {
@@ -432,6 +440,25 @@ menu button {
   25% { transform: translateX(-5px) translateZ(24px); }
   50% { transform: translateX(5px) translateZ(24px); }
   75% { transform: translateX(-3px) translateZ(24px); }
+}
+
+@keyframes arrowEscape {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  18% {
+    opacity: 1;
+    transform: translate(calc(var(--escape-x) * -0.025), calc(var(--escape-y) * -0.025)) scale(1.04);
+  }
+  46% {
+    opacity: 0.98;
+    transform: translate(calc(var(--escape-x) * 0.22), calc(var(--escape-y) * 0.22)) scale(0.96);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--escape-x), var(--escape-y)) scale(0.58);
+  }
 }
 
 @keyframes gate-pulse {
