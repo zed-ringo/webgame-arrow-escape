@@ -294,12 +294,18 @@ function ropePath(cells) {
 }
 
 function arrowHeadPoints(piece) {
-  const head = point(piece.cells[piece.cells.length - 1]);
+  const head = piece.points ? piece.points[piece.points.length - 1] : point(piece.cells[piece.cells.length - 1]);
   const angle = DIRECTIONS[piece.direction].angle * Math.PI / 180;
   const tip = { x: head.x + Math.cos(angle) * 35, y: head.y + Math.sin(angle) * 35 };
   const left = { x: head.x + Math.cos(angle + 2.48) * 28, y: head.y + Math.sin(angle + 2.48) * 28 };
   const right = { x: head.x + Math.cos(angle - 2.48) * 28, y: head.y + Math.sin(angle - 2.48) * 28 };
   return `${tip.x},${tip.y} ${left.x},${left.y} ${right.x},${right.y}`;
+}
+
+function pointsPath(points) {
+  return points
+    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
+    .join(" ");
 }
 
 function renderBoard() {
@@ -361,9 +367,51 @@ function animateEscape(piece) {
   const direction = DIRECTIONS[piece.direction];
   const group = boardEl.querySelector(`[data-id="${piece.id}"]`);
   if (!group) return;
-  group.style.setProperty("--escape-x", `${direction.x}px`);
-  group.style.setProperty("--escape-y", `${direction.y}px`);
-  group.classList.add("escaping");
+  const body = group.querySelector(".rope-body");
+  const shadow = group.querySelector(".rope-shadow");
+  const head = group.querySelector(".rope-head");
+  const start = performance.now();
+  const duration = 720;
+  const basePoints = piece.cells.map(point);
+  const pullDistance = Math.max(state.rows, state.cols) * CELL * 1.25;
+
+  group.classList.add("pulling");
+
+  function frame(now) {
+    const elapsed = Math.min(1, (now - start) / duration);
+    const eased = 1 - Math.pow(1 - elapsed, 3);
+    const distance = eased * pullDistance;
+    const shifted = basePoints
+      .map((basePoint, index) => {
+        const lag = (basePoints.length - 1 - index) * CELL * 0.34;
+        const localDistance = Math.max(0, distance - lag);
+        return {
+          x: basePoint.x + direction.col * localDistance,
+          y: basePoint.y + direction.row * localDistance,
+        };
+      })
+      .filter((item) => (
+        item.x > -PAD * 2
+        && item.x < PAD * 2 + (state.cols - 1) * CELL
+        && item.y > -PAD * 2
+        && item.y < PAD * 2 + (state.rows - 1) * CELL
+      ));
+
+    if (shifted.length >= 2) {
+      const d = pointsPath(shifted);
+      body.setAttribute("d", d);
+      shadow.setAttribute("d", d);
+      const transient = { ...piece, points: shifted };
+      head.setAttribute("points", arrowHeadPoints(transient));
+      group.style.opacity = String(1 - eased * 0.75);
+    } else {
+      group.style.opacity = "0";
+    }
+
+    if (elapsed < 1) window.requestAnimationFrame(frame);
+  }
+
+  window.requestAnimationFrame(frame);
 }
 
 function markBlocked(id) {
@@ -392,7 +440,7 @@ function movePiece(id) {
   piece.escaped = true;
   animateEscape(piece);
   emitPieceParticles(piece, "#4b5caa", 12);
-  window.setTimeout(renderBoard, 640);
+  window.setTimeout(renderBoard, 760);
   messageEl.textContent = state.left ? "紐の進路を読んで、次の矢印を抜きましょう" : "すべての矢印が脱出しました";
   updateHud();
   checkWin();

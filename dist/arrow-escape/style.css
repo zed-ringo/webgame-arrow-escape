@@ -344,13 +344,8 @@ h1 {
   animation: blocked 240ms ease;
 }
 
-.rope-piece.escaping {
-  animation: ropePull 660ms cubic-bezier(0.2, 0.86, 0.18, 1) forwards;
-}
-
-.rope-piece.escaping .rope-body,
-.rope-piece.escaping .rope-shadow {
-  animation: ropeRetract 660ms cubic-bezier(0.2, 0.86, 0.18, 1) forwards;
+.rope-piece.pulling {
+  pointer-events: none;
 }
 
 .rope-piece.hint-pulse {
@@ -413,34 +408,6 @@ menu button {
   25% { transform: translateX(-5px) translateZ(24px); }
   50% { transform: translateX(5px) translateZ(24px); }
   75% { transform: translateX(-3px) translateZ(24px); }
-}
-
-@keyframes ropePull {
-  0% {
-    opacity: 1;
-    transform: translate(0, 0) scale(1);
-  }
-  16% {
-    opacity: 1;
-    transform: translate(calc(var(--escape-x) * -0.018), calc(var(--escape-y) * -0.018)) scale(1.01);
-  }
-  48% {
-    opacity: 0.98;
-    transform: translate(calc(var(--escape-x) * 0.22), calc(var(--escape-y) * 0.22)) scale(0.98);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(var(--escape-x), var(--escape-y)) scale(0.92);
-  }
-}
-
-@keyframes ropeRetract {
-  0% {
-    stroke-dashoffset: 0;
-  }
-  100% {
-    stroke-dashoffset: -100;
-  }
 }
 
 @media (max-width: 780px) {
