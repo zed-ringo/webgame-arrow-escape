@@ -15,6 +15,7 @@ Escape every arrow line from the board.
 - Choosing a blocked arrow counts as a mistake.
 - The player has 3 mistakes.
 - Clear every arrow line to win.
+- Boards are generated in reverse from a valid escape sequence, so every generated board has at least one solution.
 
 ## Controls
 

@@ -1,7 +1,7 @@
 const CONFIGS = {
-  easy: { size: 6, pieces: 13, minLength: 2, maxLength: 4 },
-  normal: { size: 7, pieces: 20, minLength: 2, maxLength: 5 },
-  hard: { size: 8, pieces: 28, minLength: 3, maxLength: 6 },
+  easy: { size: 6, targetPieces: 10, minLength: 2, maxLength: 4 },
+  normal: { size: 7, targetPieces: 15, minLength: 2, maxLength: 4 },
+  hard: { size: 8, targetPieces: 20, minLength: 2, maxLength: 4 },
 };
 
 const DIRECTIONS = {
@@ -36,7 +36,7 @@ function createState(difficulty = "normal") {
     moves: 0,
     mistakes: 0,
     maxMistakes: 3,
-    left: config.pieces,
+    left: config.targetPieces,
     ended: false,
     history: [],
   };
@@ -106,31 +106,114 @@ function outwardDirection(cell) {
   return options[Math.floor(Math.random() * options.length)].direction;
 }
 
-function createPath(occupied, length) {
+function rayClear(cell, directionName, occupied) {
+  const direction = DIRECTIONS[directionName];
+  let row = cell.row + direction.row;
+  let col = cell.col + direction.col;
+  while (inBounds(row, col)) {
+    if (occupied.has(key(row, col))) return false;
+    row += direction.row;
+    col += direction.col;
+  }
+  return true;
+}
+
+function exitRayCells(piece, pieces) {
+  const occupied = occupiedBy(pieces, piece.id);
+  const direction = DIRECTIONS[piece.direction];
+  const cells = [];
+  piece.cells.forEach((cell) => {
+    let row = cell.row + direction.row;
+    let col = cell.col + direction.col;
+    while (inBounds(row, col)) {
+      const cellKey = key(row, col);
+      if (occupied.has(cellKey)) break;
+      cells.push(cellKey);
+      row += direction.row;
+      col += direction.col;
+    }
+  });
+  return cells;
+}
+
+function blockingTargets(pieces, occupied) {
+  const targets = new Set();
+  pieces.forEach((piece) => {
+    if (piece.escaped) return;
+    exitRayCells(piece, pieces).forEach((cellKey) => {
+      if (!occupied.has(cellKey)) targets.add(cellKey);
+    });
+  });
+  return targets;
+}
+
+function growthOptions(directionName) {
+  const direction = DIRECTIONS[directionName];
+  const backward = { row: -direction.row, col: -direction.col };
+  const sideways = Object.values(DIRECTIONS)
+    .filter((item) => item.row !== direction.row || item.col !== direction.col)
+    .filter((item) => item.row !== backward.row || item.col !== backward.col);
+  return [backward, backward, ...sideways];
+}
+
+function createArrowLineCandidate(occupied, length, directionName) {
   const starts = shuffled(Array.from({ length: state.size * state.size }, (_, index) => ({
     row: Math.floor(index / state.size),
     col: index % state.size,
   })));
+  const growBy = growthOptions(directionName);
 
-  for (const start of starts) {
-    if (occupied.has(key(start.row, start.col))) continue;
-    const cells = [start];
-    const used = new Set([key(start.row, start.col)]);
-    let attempts = 0;
-    while (cells.length < length && attempts < 60) {
-      attempts += 1;
-      const tail = cells[cells.length - 1];
-      const options = shuffled(Object.values(DIRECTIONS))
-        .map((direction) => ({ row: tail.row + direction.row, col: tail.col + direction.col }))
-        .filter((cell) => inBounds(cell.row, cell.col) && !used.has(key(cell.row, cell.col)) && !occupied.has(key(cell.row, cell.col)));
-      if (!options.length) break;
-      const next = options[0];
+  for (const head of starts) {
+    if (occupied.has(key(head.row, head.col)) || !rayClear(head, directionName, occupied)) continue;
+    const cells = [head];
+    const used = new Set([key(head.row, head.col)]);
+
+    while (cells.length < length) {
+      const anchors = shuffled(cells);
+      let next = null;
+      for (const anchor of anchors) {
+        const options = shuffled(growBy)
+          .map((direction) => ({ row: anchor.row + direction.row, col: anchor.col + direction.col }))
+          .filter((cell) => {
+            const cellKey = key(cell.row, cell.col);
+            return inBounds(cell.row, cell.col)
+              && !used.has(cellKey)
+              && !occupied.has(cellKey)
+              && rayClear(cell, directionName, occupied);
+          });
+        if (options.length) {
+          next = options[0];
+          break;
+        }
+      }
+      if (!next) break;
       cells.push(next);
       used.add(key(next.row, next.col));
     }
-    if (cells.length === length) return cells;
+
+    if (cells.length === length) return cells.reverse();
   }
+
   return null;
+}
+
+function createArrowLine(occupied, length, pieces) {
+  const targets = blockingTargets(pieces, occupied);
+  let best = null;
+
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    const direction = shuffled(Object.keys(DIRECTIONS))[0];
+    const cells = createArrowLineCandidate(occupied, length, direction);
+    if (!cells) continue;
+    const blocks = cells.filter((cell) => targets.has(key(cell.row, cell.col))).length;
+    const edgeDistance = Math.min(...cells.map((cell) => (
+      Math.min(cell.row, state.size - 1 - cell.row, cell.col, state.size - 1 - cell.col)
+    )));
+    const score = blocks * 10 + edgeDistance + Math.random();
+    if (!best || score > best.score) best = { cells, direction, score };
+  }
+
+  return best;
 }
 
 function generatePieces() {
@@ -138,27 +221,27 @@ function generatePieces() {
   const occupied = new Map();
   let attempts = 0;
 
-  while (pieces.length < state.pieces && attempts < state.pieces * 120) {
+  while (pieces.length < state.targetPieces && attempts < state.targetPieces * 180) {
     attempts += 1;
     const length = randInt(state.minLength, state.maxLength);
-    const cells = createPath(occupied, length);
-    if (!cells) break;
+    const candidate = createArrowLine(occupied, length, pieces);
+    if (!candidate) continue;
+    const { cells, direction } = candidate;
     cells.forEach((cell) => occupied.set(key(cell.row, cell.col), pieces.length + 1));
-    const head = cells[cells.length - 1];
     pieces.push({
       id: pieces.length + 1,
       cells,
-      direction: outwardDirection(head),
+      direction,
       color: COLORS[pieces.length % COLORS.length],
       escaped: false,
     });
   }
 
-  return pieces;
+  return pieces.reverse().map((piece, index) => ({ ...piece, id: index + 1 }));
 }
 
-function canEscape(piece) {
-  const occupied = occupiedBy(state.pieces, piece.id);
+function canEscape(piece, pieces = state.pieces) {
+  const occupied = occupiedBy(pieces, piece.id);
   const direction = DIRECTIONS[piece.direction];
   let step = 1;
 
