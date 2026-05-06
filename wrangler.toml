@@ -1,0 +1,9 @@
+name = "webgame-arrow-escape"
+account_id = "524c8bd900e5189c6a55d88f45e0f2a0"
+compatibility_date = "2026-05-06"
+route = "webgame.beta.menu/arrow-escape/*"
+
+[assets]
+directory = "./dist"
+html_handling = "force-trailing-slash"
+not_found_handling = "404-page"

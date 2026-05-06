@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Arrow Escape</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <main class="app" aria-labelledby="game-title">
+      <section class="hud" aria-label="ゲーム情報">
+        <div class="hud-top">
+          <div class="brand">
+            <span class="mark" aria-hidden="true"></span>
+            <div>
+              <h1 id="game-title">Arrow Escape</h1>
+              <p>Logic slide puzzle</p>
+            </div>
+          </div>
+
+          <div class="setup-controls" role="group" aria-label="ゲーム設定">
+            <div class="segmented" role="group" aria-label="難易度">
+              <button type="button" data-difficulty="easy">Easy</button>
+              <button type="button" data-difficulty="normal" aria-pressed="true">Normal</button>
+              <button type="button" data-difficulty="hard">Hard</button>
+            </div>
+            <button id="new-game" class="icon-button power-button" type="button" aria-label="新しいゲーム" title="新しいゲーム">
+              <span aria-hidden="true">⏻</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="hud-bottom">
+          <div class="meters" aria-live="polite">
+            <div class="meter">
+              <span>MOVES</span>
+              <strong id="moves">000</strong>
+            </div>
+            <div class="meter">
+              <span>LEFT</span>
+              <strong id="left">000</strong>
+            </div>
+            <div class="meter">
+              <span>MISS</span>
+              <strong id="misses">0/3</strong>
+            </div>
+          </div>
+
+          <div class="play-controls" role="group" aria-label="ゲーム中の操作">
+            <button id="undo" class="icon-button" type="button" aria-label="一手戻す" title="一手戻す">
+              <span aria-hidden="true">↶</span>
+            </button>
+            <button id="hint" class="icon-button" type="button" aria-label="動ける矢印を示す" title="動ける矢印を示す">
+              <span aria-hidden="true">?</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="stage-wrap" aria-label="Arrow Escape 盤面">
+        <div class="status-line">
+          <span id="message">正しい矢印を選んで、3ミス以内に脱出させましょう</span>
+          <span class="hint">矢印ラインをタップ / クリックで発射</span>
+        </div>
+        <div class="scene" id="scene">
+          <canvas id="spark-canvas" aria-hidden="true"></canvas>
+          <div id="board" class="board" role="grid" aria-label="Arrow Escape"></div>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="result-dialog">
+      <form method="dialog" class="dialog-body">
+        <span id="result-kicker">CLEAR</span>
+        <h2 id="result-title">脱出完了</h2>
+        <p id="result-copy"></p>
+        <menu>
+          <button value="close">盤面を見る</button>
+          <button value="restart" class="primary">次の盤面</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,54 @@
+# Arrow Escape Handoff
+
+Last updated: 2026-05-06
+
+## Project
+
+Static logic puzzle game deployed with Cloudflare Workers Assets.
+
+- Local workspace: `/Volumes/work-ringo/2605-MineSweeper/arrow-escape`
+- Public URL: `https://webgame.beta.menu/arrow-escape/`
+- Cloudflare account: `ZED Playground`
+- Cloudflare account ID: `524c8bd900e5189c6a55d88f45e0f2a0`
+- Worker name: `webgame-arrow-escape`
+- Route: `webgame.beta.menu/arrow-escape/*`
+
+## Files
+
+- `index.html`: App markup, HUD, board shell.
+- `style.css`: Responsive layout, 3D arrow-line styling, animations.
+- `app.js`: Puzzle generation, movement rules, undo, hint, records.
+- `docs/GAME_RULES.md`: Game rules and input behavior.
+- `docs/SETTINGS.md`: Deployment and Cloudflare settings.
+- `dist/arrow-escape/`: Final upload files.
+
+## Build And Deploy
+
+Sync source files into the deploy directory:
+
+```sh
+rtk proxy cp -X index.html style.css app.js dist/arrow-escape/
+```
+
+Check JavaScript:
+
+```sh
+rtk node --check app.js
+rtk node --check dist/arrow-escape/app.js
+```
+
+Deploy from this directory:
+
+```sh
+rtk npx --yes wrangler deploy
+```
+
+## Implementation Notes
+
+- Pieces are free-form arrow lines occupying connected cells.
+- The rectangular block concept was intentionally removed.
+- Tapping an arrow line launches the whole line in its head direction. It escapes only if its travel path is clear.
+- The game now follows the common tap-out pattern more closely: no default correct-arrow highlight, blocked choices count as mistakes, and the player has 3 mistakes.
+- Records are stored in `localStorage`.
+- The game intentionally uses a generic abstract arrow-and-grid rule set, not copied levels, art, names, or assets from any existing app.
+- The visual direction is a floating 3D board with thick arrow-line segments and depth-heavy escape animation.
