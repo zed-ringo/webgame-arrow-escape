@@ -18,6 +18,7 @@ Escape every arrow line from the board.
 - Clear every arrow line to win.
 - Boards are generated in reverse from a valid escape sequence, so every generated board has at least one solution.
 - The visible playfield is a light dotted field, because the puzzle is about rope shape, arrow direction, and escape lanes.
+- Easy, Normal, and Hard currently use hand-authored fixed levels so animation and puzzle feel can be tuned reliably.
 
 ## Controls
 

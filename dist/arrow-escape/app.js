@@ -4,6 +4,39 @@ const CONFIGS = {
   hard: { rows: 10, cols: 10, targetPieces: 17, minLength: 4, maxLength: 8 },
 };
 
+const LEVELS = {
+  easy: [
+    { cells: [[1, 1], [2, 1], [3, 1]], direction: "down" },
+    { cells: [[2, 4], [2, 3], [2, 2]], direction: "left" },
+    { cells: [[5, 3], [4, 3], [3, 3]], direction: "up" },
+    { cells: [[4, 6], [4, 5], [5, 5], [5, 4]], direction: "left" },
+    { cells: [[1, 6], [2, 6], [3, 6]], direction: "down" },
+    { cells: [[6, 2], [6, 3], [6, 4]], direction: "right" },
+  ],
+  normal: [
+    { cells: [[1, 1], [2, 1], [3, 1], [4, 1]], direction: "down" },
+    { cells: [[2, 5], [2, 4], [2, 3], [2, 2]], direction: "left" },
+    { cells: [[6, 3], [5, 3], [4, 3], [3, 3]], direction: "up" },
+    { cells: [[4, 7], [4, 6], [5, 6], [5, 5], [5, 4]], direction: "left" },
+    { cells: [[1, 7], [2, 7], [3, 7]], direction: "down" },
+    { cells: [[7, 1], [7, 2], [7, 3], [7, 4]], direction: "right" },
+    { cells: [[6, 7], [6, 6], [6, 5]], direction: "left" },
+    { cells: [[0, 4], [1, 4], [1, 5]], direction: "right" },
+  ],
+  hard: [
+    { cells: [[1, 1], [2, 1], [3, 1], [4, 1]], direction: "down" },
+    { cells: [[2, 6], [2, 5], [2, 4], [2, 3], [2, 2]], direction: "left" },
+    { cells: [[7, 3], [6, 3], [5, 3], [4, 3], [3, 3]], direction: "up" },
+    { cells: [[4, 8], [4, 7], [5, 7], [5, 6], [5, 5], [5, 4]], direction: "left" },
+    { cells: [[1, 8], [2, 8], [3, 8]], direction: "down" },
+    { cells: [[8, 1], [8, 2], [8, 3], [8, 4], [8, 5]], direction: "right" },
+    { cells: [[7, 8], [7, 7], [7, 6], [6, 6]], direction: "left" },
+    { cells: [[0, 4], [1, 4], [1, 5], [1, 6]], direction: "right" },
+    { cells: [[6, 2], [6, 1], [6, 0]], direction: "left" },
+    { cells: [[3, 5], [3, 6], [3, 7]], direction: "right" },
+  ],
+};
+
 const DIRECTIONS = {
   up: { row: -1, col: 0, glyph: "↑", x: 0, y: -980, angle: -90 },
   right: { row: 0, col: 1, glyph: "→", x: 980, y: 0, angle: 0 },
@@ -234,6 +267,16 @@ function generatePieces() {
   return pieces.reverse().map((piece, index) => ({ ...piece, id: index + 1, color: COLORS[index % COLORS.length] }));
 }
 
+function levelPieces(difficulty) {
+  return LEVELS[difficulty].map((piece, index) => ({
+    id: index + 1,
+    cells: piece.cells.map(([row, col]) => ({ row, col })),
+    direction: piece.direction,
+    color: COLORS[index % COLORS.length],
+    escaped: false,
+  }));
+}
+
 function point(cell) {
   return {
     x: PAD + cell.col * CELL,
@@ -400,7 +443,7 @@ function checkLose() {
 
 function startGame(difficulty = state?.difficulty || "normal") {
   state = createState(difficulty);
-  state.pieces = generatePieces();
+  state.pieces = levelPieces(difficulty);
   state.left = state.pieces.length;
   renderBoard();
   updateHud();
