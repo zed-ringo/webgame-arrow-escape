@@ -9,6 +9,7 @@ Escape every arrow line from the board.
 ## Rules
 
 - Each arrow is a free-form line occupying multiple connected cells.
+- Arrows are rendered as continuous curved-looking paths on a dark tray, not as square blocks.
 - Tap or click an arrow line to launch it in the direction of its arrow head.
 - If the arrow line can travel off the board without colliding with another arrow, it escapes.
 - If another arrow is in the travel path, choosing it counts as a mistake.
@@ -16,6 +17,7 @@ Escape every arrow line from the board.
 - The player has 3 mistakes.
 - Clear every arrow line to win.
 - Boards are generated in reverse from a valid escape sequence, so every generated board has at least one solution.
+- The visible playfield is a quiet tray rather than a visible 8x8 board, because the puzzle is about arrow shape, length, and escape lanes.
 
 ## Controls
 

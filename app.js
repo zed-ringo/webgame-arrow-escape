@@ -1,18 +1,19 @@
 const CONFIGS = {
-  easy: { size: 6, targetPieces: 10, minLength: 2, maxLength: 4 },
-  normal: { size: 7, targetPieces: 15, minLength: 2, maxLength: 4 },
-  hard: { size: 8, targetPieces: 20, minLength: 2, maxLength: 4 },
+  easy: { rows: 6, cols: 8, targetPieces: 8, minLength: 3, maxLength: 5 },
+  normal: { rows: 7, cols: 10, targetPieces: 13, minLength: 3, maxLength: 6 },
+  hard: { rows: 8, cols: 10, targetPieces: 15, minLength: 4, maxLength: 6 },
 };
 
 const DIRECTIONS = {
-  up: { row: -1, col: 0, label: "↑", x: "0px", y: "-190px" },
-  right: { row: 0, col: 1, label: "→", x: "190px", y: "0px" },
-  down: { row: 1, col: 0, label: "↓", x: "0px", y: "190px" },
-  left: { row: 0, col: -1, label: "←", x: "-190px", y: "0px" },
+  up: { row: -1, col: 0, label: "上", x: 0, y: -900, angle: -90 },
+  right: { row: 0, col: 1, label: "右", x: 1100, y: 0, angle: 0 },
+  down: { row: 1, col: 0, label: "下", x: 0, y: 900, angle: 90 },
+  left: { row: 0, col: -1, label: "左", x: -1100, y: 0, angle: 180 },
 };
 
-const COLORS = ["green", "blue", "gold", "pink", "violet"];
+const COLORS = ["#58e7a5", "#58a9ff", "#ffd15c", "#ff7aa8", "#a990ff", "#ff8d55"];
 const STORAGE_KEY = "arrow-escape-records";
+const CELL = 100;
 const boardEl = document.querySelector("#board");
 const sceneEl = document.querySelector("#scene");
 const movesEl = document.querySelector("#moves");
@@ -69,7 +70,7 @@ function key(row, col) {
 }
 
 function inBounds(row, col) {
-  return row >= 0 && row < state.size && col >= 0 && col < state.size;
+  return row >= 0 && row < state.rows && col >= 0 && col < state.cols;
 }
 
 function randInt(min, max) {
@@ -92,18 +93,6 @@ function occupiedBy(pieces, excludeId = null) {
     piece.cells.forEach((cell) => occupied.set(key(cell.row, cell.col), piece.id));
   });
   return occupied;
-}
-
-function outwardDirection(cell) {
-  const distances = [
-    { direction: "up", value: cell.row },
-    { direction: "right", value: state.size - 1 - cell.col },
-    { direction: "down", value: state.size - 1 - cell.row },
-    { direction: "left", value: cell.col },
-  ];
-  const min = Math.min(...distances.map((item) => item.value));
-  const options = distances.filter((item) => item.value === min);
-  return options[Math.floor(Math.random() * options.length)].direction;
 }
 
 function rayClear(cell, directionName, occupied) {
@@ -157,9 +146,9 @@ function growthOptions(directionName) {
 }
 
 function createArrowLineCandidate(occupied, length, directionName) {
-  const starts = shuffled(Array.from({ length: state.size * state.size }, (_, index) => ({
-    row: Math.floor(index / state.size),
-    col: index % state.size,
+  const starts = shuffled(Array.from({ length: state.rows * state.cols }, (_, index) => ({
+    row: Math.floor(index / state.cols),
+    col: index % state.cols,
   })));
   const growBy = growthOptions(directionName);
 
@@ -169,23 +158,18 @@ function createArrowLineCandidate(occupied, length, directionName) {
     const used = new Set([key(head.row, head.col)]);
 
     while (cells.length < length) {
-      const anchors = shuffled(cells);
       let next = null;
-      for (const anchor of anchors) {
-        const options = shuffled(growBy)
-          .map((direction) => ({ row: anchor.row + direction.row, col: anchor.col + direction.col }))
-          .filter((cell) => {
-            const cellKey = key(cell.row, cell.col);
-            return inBounds(cell.row, cell.col)
-              && !used.has(cellKey)
-              && !occupied.has(cellKey)
-              && rayClear(cell, directionName, occupied);
-          });
-        if (options.length) {
-          next = options[0];
-          break;
-        }
-      }
+      const tail = cells[cells.length - 1];
+      const options = shuffled(growBy)
+        .map((direction) => ({ row: tail.row + direction.row, col: tail.col + direction.col }))
+        .filter((cell) => {
+          const cellKey = key(cell.row, cell.col);
+          return inBounds(cell.row, cell.col)
+            && !used.has(cellKey)
+            && !occupied.has(cellKey)
+            && rayClear(cell, directionName, occupied);
+        });
+      if (options.length) next = options[0];
       if (!next) break;
       cells.push(next);
       used.add(key(next.row, next.col));
@@ -201,13 +185,13 @@ function createArrowLine(occupied, length, pieces) {
   const targets = blockingTargets(pieces, occupied);
   let best = null;
 
-  for (let attempt = 0; attempt < 80; attempt += 1) {
+  for (let attempt = 0; attempt < 28; attempt += 1) {
     const direction = shuffled(Object.keys(DIRECTIONS))[0];
     const cells = createArrowLineCandidate(occupied, length, direction);
     if (!cells) continue;
     const blocks = cells.filter((cell) => targets.has(key(cell.row, cell.col))).length;
     const edgeDistance = Math.min(...cells.map((cell) => (
-      Math.min(cell.row, state.size - 1 - cell.row, cell.col, state.size - 1 - cell.col)
+      Math.min(cell.row, state.rows - 1 - cell.row, cell.col, state.cols - 1 - cell.col)
     )));
     const score = blocks * 10 + edgeDistance + Math.random();
     if (!best || score > best.score) best = { cells, direction, score };
@@ -221,7 +205,7 @@ function generatePieces() {
   const occupied = new Map();
   let attempts = 0;
 
-  while (pieces.length < state.targetPieces && attempts < state.targetPieces * 180) {
+  while (pieces.length < state.targetPieces && attempts < state.targetPieces * 70) {
     attempts += 1;
     const length = randInt(state.minLength, state.maxLength);
     const candidate = createArrowLine(occupied, length, pieces);
@@ -258,33 +242,69 @@ function canEscape(piece, pieces = state.pieces) {
   }
 }
 
+function cellPoint(cell) {
+  return {
+    x: cell.col * CELL + CELL / 2,
+    y: cell.row * CELL + CELL / 2,
+  };
+}
+
+function arrowPath(cells) {
+  return cells
+    .map((cell, index) => {
+      const point = cellPoint(cell);
+      return `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`;
+    })
+    .join(" ");
+}
+
+function arrowHeadPoints(piece) {
+  const head = cellPoint(piece.cells[piece.cells.length - 1]);
+  const angle = DIRECTIONS[piece.direction].angle * Math.PI / 180;
+  const tip = { x: head.x + Math.cos(angle) * 40, y: head.y + Math.sin(angle) * 40 };
+  const left = { x: head.x + Math.cos(angle + 2.45) * 34, y: head.y + Math.sin(angle + 2.45) * 34 };
+  const right = { x: head.x + Math.cos(angle - 2.45) * 34, y: head.y + Math.sin(angle - 2.45) * 34 };
+  return `${tip.x},${tip.y} ${left.x},${left.y} ${right.x},${right.y}`;
+}
+
 function renderBoard() {
   boardEl.innerHTML = "";
-  boardEl.style.setProperty("--size", state.size);
+  boardEl.style.setProperty("--rows", state.rows);
+  boardEl.style.setProperty("--cols", state.cols);
+  boardEl.style.setProperty("--view-width", state.cols * CELL);
+  boardEl.style.setProperty("--view-height", state.rows * CELL);
 
-  for (let index = 0; index < state.size * state.size; index += 1) {
-    const slot = document.createElement("div");
-    slot.className = "slot";
-    boardEl.append(slot);
-  }
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", `0 0 ${state.cols * CELL} ${state.rows * CELL}`);
+  svg.setAttribute("role", "presentation");
+  svg.classList.add("arrow-field");
 
   state.pieces.filter((piece) => !piece.escaped).forEach((piece) => {
-    piece.cells.forEach((cell, index) => {
-      const segment = document.createElement("button");
-      segment.className = `arrow-segment ${piece.color}`;
-      segment.type = "button";
-      segment.dataset.id = piece.id;
-      segment.style.setProperty("--row", cell.row);
-      segment.style.setProperty("--col", cell.col);
-      segment.setAttribute("aria-label", `${DIRECTIONS[piece.direction].label} 矢印`);
-      if (index === piece.cells.length - 1) {
-        segment.classList.add("head");
-        segment.textContent = DIRECTIONS[piece.direction].label;
-      }
-      boardEl.append(segment);
-    });
+    const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    group.classList.add("arrow-piece");
+    group.dataset.id = piece.id;
+    group.style.setProperty("--piece-color", piece.color);
+    group.setAttribute("tabindex", "0");
+    group.setAttribute("role", "button");
+    group.setAttribute("aria-label", `${DIRECTIONS[piece.direction].label}へ抜ける矢印`);
+
+    const shadow = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    shadow.classList.add("arrow-shadow");
+    shadow.setAttribute("d", arrowPath(piece.cells));
+
+    const body = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    body.classList.add("arrow-body");
+    body.setAttribute("d", arrowPath(piece.cells));
+
+    const head = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+    head.classList.add("arrow-head");
+    head.setAttribute("points", arrowHeadPoints(piece));
+
+    group.append(shadow, body, head);
+    svg.append(group);
   });
 
+  boardEl.append(svg);
   updateBoardScale();
 }
 
@@ -320,8 +340,8 @@ function movePiece(id) {
 function animateEscape(piece) {
   const direction = DIRECTIONS[piece.direction];
   boardEl.querySelectorAll(`[data-id="${piece.id}"]`).forEach((segment) => {
-    segment.style.setProperty("--escape-x", direction.x);
-    segment.style.setProperty("--escape-y", direction.y);
+    segment.style.setProperty("--escape-x", `${direction.x}px`);
+    segment.style.setProperty("--escape-y", `${direction.y}px`);
     segment.classList.add("escaping");
   });
 }
@@ -383,7 +403,7 @@ function startGame(difficulty = state?.difficulty || "normal") {
 }
 
 function pieceFromEvent(event) {
-  const segment = event.target.closest(".arrow-segment");
+  const segment = event.target.closest(".arrow-piece");
   if (!segment || !boardEl.contains(segment)) return null;
   return Number(segment.dataset.id);
 }
@@ -422,9 +442,9 @@ function updateBoardScale() {
   const gap = compact ? 4 : 7;
   const pad = compact ? 8 : 14;
   const maxCell = compact ? 48 : 54;
-  const widthCell = (sceneRect.width - 24 - pad * 2 - gap * (state.size - 1)) / state.size;
-  const heightCell = (sceneRect.height - 24 - pad * 2 - gap * (state.size - 1)) / state.size;
-  const cellSize = Math.max(24, Math.floor(Math.min(widthCell, heightCell, maxCell)));
+  const widthCell = (sceneRect.width - 24 - pad * 2 - gap * (state.cols - 1)) / state.cols;
+  const heightCell = (sceneRect.height - 24 - pad * 2 - gap * (state.rows - 1)) / state.rows;
+  const cellSize = Math.max(26, Math.floor(Math.min(widthCell, heightCell, maxCell)));
   boardEl.style.setProperty("--gap", `${gap}px`);
   boardEl.style.setProperty("--board-pad", `${pad}px`);
   boardEl.style.setProperty("--cell-size", `${cellSize}px`);
@@ -434,11 +454,9 @@ function pieceCenter(piece) {
   const head = piece.cells[piece.cells.length - 1];
   const boardRect = boardEl.getBoundingClientRect();
   const canvasRect = canvas.getBoundingClientRect();
-  const step = parseFloat(getComputedStyle(boardEl).getPropertyValue("--cell-size")) + parseFloat(getComputedStyle(boardEl).getPropertyValue("--gap"));
-  const pad = parseFloat(getComputedStyle(boardEl).getPropertyValue("--board-pad"));
   return {
-    x: boardRect.left - canvasRect.left + pad + head.col * step + step / 2,
-    y: boardRect.top - canvasRect.top + pad + head.row * step + step / 2,
+    x: boardRect.left - canvasRect.left + boardRect.width * ((head.col + 0.5) / state.cols),
+    y: boardRect.top - canvasRect.top + boardRect.height * ((head.row + 0.5) / state.rows),
   };
 }
 
