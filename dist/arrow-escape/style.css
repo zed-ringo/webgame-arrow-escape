@@ -304,11 +304,17 @@ h1 {
   cursor: pointer;
   transform-origin: center;
   transition: filter 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+  outline: none;
 }
 
 .rope-piece:hover,
 .rope-piece:focus-visible {
   filter: drop-shadow(0 0 6px rgba(75, 92, 170, 0.32));
+  outline: none;
+}
+
+.rope-piece * {
   outline: none;
 }
 

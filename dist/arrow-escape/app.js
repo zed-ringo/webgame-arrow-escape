@@ -422,7 +422,6 @@ function renderBoard() {
     group.classList.add("rope-piece");
     group.dataset.id = piece.id;
     group.style.setProperty("--piece-color", piece.color);
-    group.setAttribute("tabindex", "0");
     group.setAttribute("role", "button");
     group.setAttribute("aria-label", `${DIRECTIONS[piece.direction].glyph} 方向の矢印`);
 
@@ -618,6 +617,7 @@ function pieceFromEvent(event) {
 boardEl.addEventListener("click", (event) => {
   const id = pieceFromEvent(event);
   if (id === null) return;
+  document.activeElement?.blur?.();
   movePiece(id);
 });
 
